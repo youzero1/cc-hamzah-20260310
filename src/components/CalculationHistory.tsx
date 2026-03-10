@@ -1,97 +1,173 @@
 'use client';
 
-import { CalculationRecord } from '@/app/page';
-import ShareButton from './ShareButton';
+import { CalculationRecord } from '@/types';
 
 interface CalculationHistoryProps {
   history: CalculationRecord[];
-  loading: boolean;
+  isDark: boolean;
+  isLoading: boolean;
   onRefresh: () => void;
 }
 
 function timeAgo(dateStr: string): string {
   const date = new Date(dateStr);
   const now = new Date();
-  const diff = Math.floor((now.getTime() - date.getTime()) / 1000);
-  if (diff < 60) return `${diff}s ago`;
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return `${Math.floor(diff / 86400)}d ago`;
+  const diffMs = now.getTime() - date.getTime();
+  const diffSec = Math.floor(diffMs / 1000);
+  const diffMin = Math.floor(diffSec / 60);
+  const diffHr = Math.floor(diffMin / 60);
+  const diffDay = Math.floor(diffHr / 24);
+
+  if (diffSec < 5) return 'just now';
+  if (diffSec < 60) return `${diffSec} seconds ago`;
+  if (diffMin < 60) return `${diffMin} minute${diffMin !== 1 ? 's' : ''} ago`;
+  if (diffHr < 24) return `${diffHr} hour${diffHr !== 1 ? 's' : ''} ago`;
+  return `${diffDay} day${diffDay !== 1 ? 's' : ''} ago`;
 }
 
-export default function CalculationHistory({ history, loading, onRefresh }: CalculationHistoryProps) {
+export default function CalculationHistory({
+  history,
+  isDark,
+  isLoading,
+  onRefresh,
+}: CalculationHistoryProps) {
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      console.error('Failed to copy');
+    }
+  };
+
   return (
-    <div className="glass card-shadow rounded-3xl overflow-hidden animate-slide-up">
+    <div className={`rounded-3xl overflow-hidden shadow-xl ${
+      isDark
+        ? 'bg-gray-900 shadow-black/30'
+        : 'bg-white shadow-gray-200/80'
+    }`}>
       {/* Header */}
-      <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-700/50 flex items-center justify-between">
+      <div className={`px-5 py-4 flex items-center justify-between border-b ${
+        isDark ? 'border-gray-800' : 'border-gray-100'
+      }`}>
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
-            <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </div>
-          <h2 className="font-semibold text-slate-700 dark:text-slate-200 text-sm">Calculation History</h2>
+          <div className="w-2 h-2 rounded-full bg-gradient-to-br from-violet-500 to-pink-500" />
+          <h2 className={`font-semibold ${
+            isDark ? 'text-white' : 'text-gray-900'
+          }`}>Calculation Feed</h2>
+          {history.length > 0 && (
+            <span className={`text-xs px-2 py-0.5 rounded-full ${
+              isDark
+                ? 'bg-gray-800 text-gray-400'
+                : 'bg-gray-100 text-gray-500'
+            }`}>
+              {history.length}
+            </span>
+          )}
         </div>
         <button
           onClick={onRefresh}
-          disabled={loading}
-          className="text-slate-400 hover:text-violet-600 dark:hover:text-violet-400 transition-colors"
+          className={`text-xs px-3 py-1.5 rounded-full font-medium transition-colors ${
+            isDark
+              ? 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+          }`}
+          disabled={isLoading}
         >
-          <svg
-            className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`}
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
+          {isLoading ? '...' : '↻ Refresh'}
         </button>
       </div>
 
-      {/* Content */}
-      <div className="max-h-80 overflow-y-auto">
-        {loading ? (
-          <div className="py-12 flex flex-col items-center gap-3">
-            <div className="w-8 h-8 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
-            <p className="text-sm text-slate-400">Loading history...</p>
+      {/* Feed */}
+      <div className="h-96 lg:h-[500px] overflow-y-auto scrollbar-thin">
+        {isLoading && history.length === 0 ? (
+          <div className="flex items-center justify-center h-full">
+            <div className={`text-sm ${
+              isDark ? 'text-gray-500' : 'text-gray-400'
+            }`}>
+              Loading...
+            </div>
           </div>
         ) : history.length === 0 ? (
-          <div className="py-12 flex flex-col items-center gap-3">
-            <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center">
-              <svg className="w-6 h-6 text-slate-300 dark:text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-              </svg>
+          <div className="flex flex-col items-center justify-center h-full gap-3">
+            <div className="text-4xl">🧮</div>
+            <div className={`text-sm ${
+              isDark ? 'text-gray-500' : 'text-gray-400'
+            }`}>
+              No calculations yet
             </div>
-            <p className="text-sm text-slate-400 dark:text-slate-500">No calculations yet</p>
-            <p className="text-xs text-slate-300 dark:text-slate-600">Your history will appear here</p>
+            <div className={`text-xs ${
+              isDark ? 'text-gray-600' : 'text-gray-300'
+            }`}>
+              Start calculating to see your feed!
+            </div>
           </div>
         ) : (
-          <div className="divide-y divide-slate-100 dark:divide-slate-700/50">
+          <div className="divide-y divide-opacity-50">
             {history.map((item, index) => (
               <div
                 key={item.id}
-                className="px-5 py-3.5 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors animate-fade-in"
+                className={`px-5 py-4 transition-colors group animate-fade-in ${
+                  isDark
+                    ? 'divide-gray-800 hover:bg-gray-800/50'
+                    : 'divide-gray-100 hover:bg-gray-50'
+                }`}
                 style={{ animationDelay: `${index * 30}ms` }}
               >
                 {/* Post header */}
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-400 to-purple-500 flex items-center justify-center flex-shrink-0">
-                    <span className="text-white text-xs font-bold">cc</span>
+                  <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-500 to-pink-500 flex items-center justify-center">
+                    <span className="text-white text-xs font-bold">∑</span>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">Calculator</p>
-                    <p className="text-xs text-slate-400 dark:text-slate-500">{timeAgo(item.createdAt)}</p>
+                  <div>
+                    <span className={`text-xs font-medium ${
+                      isDark ? 'text-gray-300' : 'text-gray-700'
+                    }`}>Calculator</span>
+                    <span className={`text-xs ml-2 ${
+                      isDark ? 'text-gray-500' : 'text-gray-400'
+                    }`}>
+                      · {timeAgo(item.createdAt)}
+                    </span>
                   </div>
-                  <ShareButton expression={item.expression} result={item.result} />
                 </div>
 
-                {/* Calculation content */}
-                <div className="ml-9 bg-gradient-to-r from-violet-50 to-purple-50 dark:from-violet-900/20 dark:to-purple-900/20 rounded-xl px-3 py-2 border border-violet-100 dark:border-violet-800/30">
-                  <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">{item.expression}</p>
-                  <div className="flex items-center gap-1 mt-0.5">
-                    <span className="text-slate-400 text-sm">=</span>
-                    <p className="text-base font-bold text-violet-700 dark:text-violet-300 font-mono">{item.result}</p>
-                  </div>
+                {/* Expression */}
+                <div className={`text-sm mb-1 ${
+                  isDark ? 'text-gray-400' : 'text-gray-500'
+                }`}>
+                  {item.expression}
+                </div>
+
+                {/* Result */}
+                <div className={`text-2xl font-bold ${
+                  isDark ? 'text-white' : 'text-gray-900'
+                }`}>
+                  = {item.result}
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center gap-3 mt-2">
+                  <button
+                    onClick={() => copyToClipboard(`${item.expression} = ${item.result}`)}
+                    className={`text-xs flex items-center gap-1 transition-colors ${
+                      isDark
+                        ? 'text-gray-500 hover:text-violet-400'
+                        : 'text-gray-400 hover:text-violet-600'
+                    }`}
+                  >
+                    <span>📋</span>
+                    <span>Copy</span>
+                  </button>
+                  <button
+                    onClick={() => copyToClipboard(item.result)}
+                    className={`text-xs flex items-center gap-1 transition-colors ${
+                      isDark
+                        ? 'text-gray-500 hover:text-pink-400'
+                        : 'text-gray-400 hover:text-pink-600'
+                    }`}
+                  >
+                    <span>🔗</span>
+                    <span>Share result</span>
+                  </button>
                 </div>
               </div>
             ))}

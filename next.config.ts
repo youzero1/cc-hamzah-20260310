@@ -1,19 +1,18 @@
-/** @type {import('next').NextConfig} */
-const nextConfig = {
-  output: 'standalone',
+import type { NextConfig } from 'next';
+
+const nextConfig: NextConfig = {
   experimental: {
     serverComponentsExternalPackages: ['typeorm', 'better-sqlite3'],
   },
   webpack: (config, { isServer }) => {
     if (isServer) {
+      config.externals = config.externals || [];
       if (Array.isArray(config.externals)) {
         config.externals.push('better-sqlite3');
-      } else {
-        config.externals = ['better-sqlite3'];
       }
     }
     return config;
   },
 };
 
-module.exports = nextConfig;
+export default nextConfig;

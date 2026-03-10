@@ -3,114 +3,129 @@
 import { useState, useEffect } from 'react';
 import Calculator from '@/components/Calculator';
 import CalculationHistory from '@/components/CalculationHistory';
-
-export interface CalculationRecord {
-  id: number;
-  expression: string;
-  result: string;
-  createdAt: string;
-}
+import { CalculationRecord } from '@/types';
 
 export default function Home() {
-  const [isDark, setIsDark] = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
+  const [isDark, setIsDark] = useState(true);
   const [history, setHistory] = useState<CalculationRecord[]>([]);
-  const [historyLoading, setHistoryLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    setIsDark(prefersDark);
+    const saved = localStorage.getItem('theme');
+    if (saved) {
+      setIsDark(saved === 'dark');
+    } else {
+      setIsDark(true);
+    }
+    fetchHistory();
   }, []);
 
   useEffect(() => {
     if (isDark) {
       document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
     } else {
       document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
     }
   }, [isDark]);
 
   const fetchHistory = async () => {
-    setHistoryLoading(true);
     try {
+      setIsLoading(true);
       const res = await fetch('/api/history');
-      const data = await res.json();
-      setHistory(data);
-    } catch (e) {
-      console.error('Failed to fetch history', e);
+      if (res.ok) {
+        const data = await res.json();
+        setHistory(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch history:', err);
     } finally {
-      setHistoryLoading(false);
+      setIsLoading(false);
     }
   };
 
-  const handleToggleHistory = () => {
-    if (!showHistory) {
-      fetchHistory();
+  const handleCalculation = async (expression: string, result: string) => {
+    try {
+      const res = await fetch('/api/calculations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expression, result }),
+      });
+      if (res.ok) {
+        fetchHistory();
+      }
+    } catch (err) {
+      console.error('Failed to save calculation:', err);
     }
-    setShowHistory((prev) => !prev);
   };
 
-  const handleCalculationSaved = () => {
-    if (showHistory) {
-      fetchHistory();
-    }
-  };
+  const appName = process.env.NEXT_PUBLIC_APP_NAME || 'cc';
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-violet-50 via-purple-50 to-indigo-100 dark:from-slate-950 dark:via-purple-950 dark:to-indigo-950 flex flex-col items-center justify-center p-4">
+    <div className={`min-h-screen transition-colors duration-300 ${
+      isDark
+        ? 'bg-gray-950 text-white'
+        : 'bg-gray-50 text-gray-900'
+    }`}>
       {/* Header */}
-      <header className="w-full max-w-md mb-6 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg">
-            <span className="text-white font-bold text-sm">cc</span>
+      <header className={`sticky top-0 z-50 border-b backdrop-blur-md ${
+        isDark
+          ? 'bg-gray-950/80 border-gray-800'
+          : 'bg-gray-50/80 border-gray-200'
+      }`}>
+        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-pink-500 flex items-center justify-center">
+              <span className="text-white text-sm font-bold">{appName[0].toUpperCase()}</span>
+            </div>
+            <span className="text-xl font-bold bg-gradient-to-r from-violet-500 to-pink-500 bg-clip-text text-transparent">
+              {appName}
+            </span>
           </div>
-          <h1 className="text-xl font-bold text-slate-800 dark:text-white">
-            {process.env.NEXT_PUBLIC_APP_NAME || 'cc'}
-          </h1>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleToggleHistory}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/70 dark:bg-slate-800/70 backdrop-blur border border-white/30 dark:border-slate-700/50 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 transition-all shadow-sm"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            History
-          </button>
-          <button
-            onClick={() => setIsDark((d) => !d)}
-            className="w-8 h-8 rounded-full bg-white/70 dark:bg-slate-800/70 backdrop-blur border border-white/30 dark:border-slate-700/50 flex items-center justify-center hover:bg-white dark:hover:bg-slate-700 transition-all shadow-sm"
-          >
-            {isDark ? (
-              <svg className="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 2.25a.75.75 0 01.75.75v2.25a.75.75 0 01-1.5 0V3a.75.75 0 01.75-.75zM7.5 12a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM18.894 6.166a.75.75 0 00-1.06-1.06l-1.591 1.59a.75.75 0 101.06 1.061l1.591-1.59zM21.75 12a.75.75 0 01-.75.75h-2.25a.75.75 0 010-1.5H21a.75.75 0 01.75.75zM17.834 18.894a.75.75 0 001.06-1.06l-1.59-1.591a.75.75 0 10-1.061 1.06l1.59 1.591zM12 18a.75.75 0 01.75.75V21a.75.75 0 01-1.5 0v-2.25A.75.75 0 0112 18zM7.166 17.834a.75.75 0 00-1.06 1.06l1.59 1.591a.75.75 0 001.061-1.06l-1.59-1.591zM6 12a.75.75 0 01-.75.75H3a.75.75 0 010-1.5h2.25A.75.75 0 016 12zM6.166 6.166a.75.75 0 001.06 1.06l1.591-1.59a.75.75 0 00-1.06-1.061l-1.591 1.59z" />
-              </svg>
-            ) : (
-              <svg className="w-4 h-4 text-slate-600" fill="currentColor" viewBox="0 0 24 24">
-                <path fillRule="evenodd" d="M9.528 1.718a.75.75 0 01.162.819A8.97 8.97 0 009 6a9 9 0 009 9 8.97 8.97 0 003.463-.69.75.75 0 01.981.98 10.503 10.503 0 01-9.694 6.46c-5.799 0-10.5-4.701-10.5-10.5 0-4.368 2.667-8.112 6.46-9.694a.75.75 0 01.818.162z" clipRule="evenodd" />
-              </svg>
-            )}
-          </button>
+          <div className="flex items-center gap-3">
+            <span className={`text-sm ${
+              isDark ? 'text-gray-400' : 'text-gray-500'
+            }`}>Calculator</span>
+            <button
+              onClick={() => setIsDark(!isDark)}
+              className={`relative w-12 h-6 rounded-full transition-colors duration-300 ${
+                isDark ? 'bg-violet-600' : 'bg-gray-300'
+              }`}
+              aria-label="Toggle theme"
+            >
+              <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform duration-300 flex items-center justify-center text-xs ${
+                isDark ? 'translate-x-6' : 'translate-x-0'
+              }`}>
+                {isDark ? '🌙' : '☀️'}
+              </span>
+            </button>
+          </div>
         </div>
       </header>
 
-      {/* Main content */}
-      <div className="w-full max-w-md flex flex-col gap-4">
-        <Calculator onCalculationSaved={handleCalculationSaved} />
-        {showHistory && (
-          <CalculationHistory
-            history={history}
-            loading={historyLoading}
-            onRefresh={fetchHistory}
-          />
-        )}
-      </div>
+      {/* Main Content */}
+      <main className="max-w-6xl mx-auto px-4 py-8">
+        <div className="flex flex-col lg:flex-row gap-8 items-start justify-center">
+          {/* Calculator */}
+          <div className="w-full lg:w-auto flex justify-center">
+            <Calculator
+              isDark={isDark}
+              onCalculation={handleCalculation}
+            />
+          </div>
 
-      {/* Footer */}
-      <footer className="mt-8 text-center text-xs text-slate-400 dark:text-slate-600">
-        <p>Made with ❤️ · cc calculator</p>
-      </footer>
-    </main>
+          {/* History Feed */}
+          <div className="w-full lg:flex-1 lg:max-w-md">
+            <CalculationHistory
+              history={history}
+              isDark={isDark}
+              isLoading={isLoading}
+              onRefresh={fetchHistory}
+            />
+          </div>
+        </div>
+      </main>
+    </div>
   );
 }

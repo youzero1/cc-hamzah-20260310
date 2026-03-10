@@ -4,15 +4,6 @@ import { Calculation } from '@/entities/Calculation';
 import path from 'path';
 import fs from 'fs';
 
-const dbPath = process.env.DATABASE_PATH || './data/calculator.sqlite';
-const resolvedDbPath = path.resolve(process.cwd(), dbPath);
-
-// Ensure directory exists
-const dbDir = path.dirname(resolvedDbPath);
-if (!fs.existsSync(dbDir)) {
-  fs.mkdirSync(dbDir, { recursive: true });
-}
-
 let dataSource: DataSource | null = null;
 
 export async function getDataSource(): Promise<DataSource> {
@@ -20,9 +11,17 @@ export async function getDataSource(): Promise<DataSource> {
     return dataSource;
   }
 
+  const dbPath = process.env.DATABASE_PATH || './data/cc.sqlite';
+  const resolvedPath = path.resolve(process.cwd(), dbPath);
+  const dbDir = path.dirname(resolvedPath);
+
+  if (!fs.existsSync(dbDir)) {
+    fs.mkdirSync(dbDir, { recursive: true });
+  }
+
   dataSource = new DataSource({
     type: 'better-sqlite3',
-    database: resolvedDbPath,
+    database: resolvedPath,
     entities: [Calculation],
     synchronize: true,
     logging: false,

@@ -1,250 +1,255 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import CalculatorDisplay from './CalculatorDisplay';
 import CalculatorButton from './CalculatorButton';
 import ShareButton from './ShareButton';
-import { evaluate } from '@/lib/calculator';
+import { ButtonConfig } from '@/types';
 
 interface CalculatorProps {
-  onCalculationSaved: () => void;
+  isDark: boolean;
+  onCalculation: (expression: string, result: string) => void;
 }
 
-type ButtonConfig = {
-  label: string;
-  action: string;
-  variant?: 'default' | 'operator' | 'special' | 'equals' | 'zero';
-};
-
-const BUTTONS: ButtonConfig[][] = [
-  [
-    { label: 'AC', action: 'clear', variant: 'special' },
-    { label: '+/−', action: 'negate', variant: 'special' },
-    { label: '%', action: '%', variant: 'special' },
-    { label: '÷', action: '/', variant: 'operator' },
-  ],
-  [
-    { label: '7', action: '7' },
-    { label: '8', action: '8' },
-    { label: '9', action: '9' },
-    { label: '×', action: '*', variant: 'operator' },
-  ],
-  [
-    { label: '4', action: '4' },
-    { label: '5', action: '5' },
-    { label: '6', action: '6' },
-    { label: '−', action: '-', variant: 'operator' },
-  ],
-  [
-    { label: '1', action: '1' },
-    { label: '2', action: '2' },
-    { label: '3', action: '3' },
-    { label: '+', action: '+', variant: 'operator' },
-  ],
-  [
-    { label: '0', action: '0', variant: 'zero' },
-    { label: '.', action: '.' },
-    { label: '=', action: '=', variant: 'equals' },
-  ],
+const BUTTONS: ButtonConfig[] = [
+  { label: 'AC', value: 'AC', type: 'action' },
+  { label: '+/-', value: 'NEGATE', type: 'action' },
+  { label: '%', value: '%', type: 'action' },
+  { label: '÷', value: '/', type: 'operator' },
+  { label: '7', value: '7', type: 'number' },
+  { label: '8', value: '8', type: 'number' },
+  { label: '9', value: '9', type: 'number' },
+  { label: '×', value: '*', type: 'operator' },
+  { label: '4', value: '4', type: 'number' },
+  { label: '5', value: '5', type: 'number' },
+  { label: '6', value: '6', type: 'number' },
+  { label: '−', value: '-', type: 'operator' },
+  { label: '1', value: '1', type: 'number' },
+  { label: '2', value: '2', type: 'number' },
+  { label: '3', value: '3', type: 'number' },
+  { label: '+', value: '+', type: 'operator' },
+  { label: '⌫', value: 'BACK', type: 'action' },
+  { label: '0', value: '0', type: 'number' },
+  { label: '.', value: '.', type: 'number' },
+  { label: '=', value: '=', type: 'equals' },
 ];
 
-export default function Calculator({ onCalculationSaved }: CalculatorProps) {
+export default function Calculator({ isDark, onCalculation }: CalculatorProps) {
+  const [display, setDisplay] = useState('0');
   const [expression, setExpression] = useState('');
-  const [current, setCurrent] = useState('0');
-  const [justEvaluated, setJustEvaluated] = useState(false);
-  const [lastExpression, setLastExpression] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState(false);
+  const [prevResult, setPrevResult] = useState<string | null>(null);
+  const [operator, setOperator] = useState<string | null>(null);
+  const [firstOperand, setFirstOperand] = useState<string | null>(null);
+  const [waitingForSecond, setWaitingForSecond] = useState(false);
+  const [lastResult, setLastResult] = useState<string>('');
+  const [lastExpression, setLastExpression] = useState<string>('');
+  const [justCalculated, setJustCalculated] = useState(false);
 
-  const isOperator = (char: string) => ['+', '-', '*', '/'].includes(char);
+  const formatNumber = (num: number): string => {
+    if (!isFinite(num)) return 'Error';
+    if (isNaN(num)) return 'Error';
+    const str = num.toString();
+    if (str.length > 12) {
+      return parseFloat(num.toPrecision(10)).toString();
+    }
+    return str;
+  };
 
-  const handleButton = useCallback(
-    async (action: string) => {
-      if (action === 'clear') {
+  const calculate = (a: number, op: string, b: number): number => {
+    switch (op) {
+      case '+': return a + b;
+      case '-': return a - b;
+      case '*': return a * b;
+      case '/':
+        if (b === 0) return NaN;
+        return a / b;
+      default: return b;
+    }
+  };
+
+  const getOperatorSymbol = (op: string): string => {
+    switch (op) {
+      case '+': return '+';
+      case '-': return '−';
+      case '*': return '×';
+      case '/': return '÷';
+      default: return op;
+    }
+  };
+
+  const handleButton = useCallback((value: string) => {
+    switch (value) {
+      case 'AC': {
+        setDisplay('0');
         setExpression('');
-        setCurrent('0');
-        setJustEvaluated(false);
-        setLastExpression('');
-        return;
+        setPrevResult(null);
+        setOperator(null);
+        setFirstOperand(null);
+        setWaitingForSecond(false);
+        setJustCalculated(false);
+        break;
       }
 
-      if (action === 'negate') {
-        if (current !== '0' && current !== '') {
-          const negated = current.startsWith('-') ? current.slice(1) : '-' + current;
-          setCurrent(negated);
-          if (justEvaluated) {
-            setExpression('');
-            setJustEvaluated(false);
-          }
+      case 'BACK': {
+        if (justCalculated) {
+          setDisplay('0');
+          setJustCalculated(false);
+          break;
         }
-        return;
-      }
-
-      if (action === '=') {
-        if (expression === '' && current === '0') return;
-        const fullExpr = expression !== '' ? expression + current : current;
-        if (fullExpr === '' || fullExpr === current) {
-          // nothing to evaluate with operator
-          if (!expression) return;
-        }
-        const result = evaluate(fullExpr);
-        const displayExpr = fullExpr
-          .replace(/\*/g, '×')
-          .replace(/\//g, '÷')
-          .replace(/-/g, '−');
-
-        setLastExpression(displayExpr);
-        setCurrent(result);
-        setExpression('');
-        setJustEvaluated(true);
-
-        // Save to database
-        if (result !== 'Error') {
-          setSaving(true);
-          setSaveError(false);
-          try {
-            await fetch('/api/calculations', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ expression: displayExpr, result }),
-            });
-            onCalculationSaved();
-          } catch {
-            setSaveError(true);
-          } finally {
-            setSaving(false);
-          }
-        }
-        return;
-      }
-
-      if (isOperator(action)) {
-        if (justEvaluated) {
-          setExpression(current + action);
-          setCurrent('');
-          setJustEvaluated(false);
-          return;
-        }
-        if (current === '' && expression !== '') {
-          // Replace last operator
-          const trimmed = expression.slice(0, -1);
-          setExpression(trimmed + action);
-          return;
-        }
-        setExpression((prev) => prev + current + action);
-        setCurrent('');
-        setJustEvaluated(false);
-        return;
-      }
-
-      if (action === '.') {
-        if (justEvaluated) {
-          setCurrent('0.');
-          setExpression('');
-          setJustEvaluated(false);
-          return;
-        }
-        if (current.includes('.')) return;
-        setCurrent((prev) => (prev === '' ? '0.' : prev + '.'));
-        return;
-      }
-
-      if (action === '%') {
-        if (current !== '') {
-          const val = parseFloat(current);
-          if (!isNaN(val)) {
-            setCurrent(String(val / 100));
-          }
-        }
-        return;
-      }
-
-      // Digit
-      if (justEvaluated) {
-        setCurrent(action);
-        setExpression('');
-        setJustEvaluated(false);
-        return;
-      }
-
-      if (current === '0' && action !== '.') {
-        setCurrent(action);
-      } else {
-        setCurrent((prev) => prev + action);
-      }
-    },
-    [current, expression, justEvaluated, onCalculationSaved]
-  );
-
-  // Keyboard support
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const key = e.key;
-      if (key >= '0' && key <= '9') handleButton(key);
-      else if (key === '+') handleButton('+');
-      else if (key === '-') handleButton('-');
-      else if (key === '*') handleButton('*');
-      else if (key === '/') { e.preventDefault(); handleButton('/'); }
-      else if (key === 'Enter' || key === '=') handleButton('=');
-      else if (key === 'Backspace') {
-        if (current.length > 1) {
-          setCurrent((prev) => prev.slice(0, -1));
+        if (display.length > 1) {
+          const newDisplay = display.slice(0, -1);
+          setDisplay(newDisplay || '0');
         } else {
-          setCurrent('0');
+          setDisplay('0');
         }
+        break;
       }
-      else if (key === 'Escape') handleButton('clear');
-      else if (key === '.') handleButton('.');
-      else if (key === '%') handleButton('%');
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleButton, current]);
 
-  const displayExpression = justEvaluated
-    ? lastExpression
-    : expression
-      ? expression.replace(/\*/g, '×').replace(/\//g, '÷').replace(/-/g, '−')
-      : '';
+      case 'NEGATE': {
+        const negated = (parseFloat(display) * -1).toString();
+        setDisplay(negated);
+        break;
+      }
+
+      case '%': {
+        const pct = parseFloat(display) / 100;
+        setDisplay(formatNumber(pct));
+        break;
+      }
+
+      case '/': 
+      case '*': 
+      case '+': 
+      case '-': {
+        const current = parseFloat(display);
+
+        if (firstOperand !== null && operator && !waitingForSecond && !justCalculated) {
+          const result = calculate(parseFloat(firstOperand), operator, current);
+          const resultStr = formatNumber(result);
+          const expr = `${firstOperand} ${getOperatorSymbol(operator)} ${display}`;
+          setDisplay(resultStr);
+          setFirstOperand(resultStr);
+          setExpression(`${resultStr} ${getOperatorSymbol(value)}`);
+          setPrevResult(resultStr);
+        } else {
+          setFirstOperand(display);
+          setExpression(`${display} ${getOperatorSymbol(value)}`);
+        }
+
+        setOperator(value);
+        setWaitingForSecond(true);
+        setJustCalculated(false);
+        break;
+      }
+
+      case '=': {
+        if (operator && firstOperand !== null) {
+          const a = parseFloat(firstOperand);
+          const b = parseFloat(display);
+          const result = calculate(a, operator, b);
+          const resultStr = formatNumber(result);
+          const expr = `${firstOperand} ${getOperatorSymbol(operator)} ${display}`;
+
+          if (resultStr === 'Error' || (display === '0' && operator === '/')) {
+            setDisplay('Error');
+            setExpression('');
+          } else {
+            setDisplay(resultStr);
+            setExpression(`${expr} =`);
+            setLastResult(resultStr);
+            setLastExpression(expr);
+            onCalculation(expr, resultStr);
+          }
+
+          setFirstOperand(null);
+          setOperator(null);
+          setWaitingForSecond(false);
+          setJustCalculated(true);
+          setPrevResult(resultStr);
+        }
+        break;
+      }
+
+      case '.': {
+        if (justCalculated) {
+          setDisplay('0.');
+          setJustCalculated(false);
+          break;
+        }
+        if (waitingForSecond) {
+          setDisplay('0.');
+          setWaitingForSecond(false);
+          break;
+        }
+        if (!display.includes('.')) {
+          setDisplay(display + '.');
+        }
+        break;
+      }
+
+      default: {
+        // Number
+        if (justCalculated) {
+          setDisplay(value);
+          setFirstOperand(null);
+          setOperator(null);
+          setExpression('');
+          setJustCalculated(false);
+          break;
+        }
+        if (waitingForSecond) {
+          setDisplay(value);
+          setWaitingForSecond(false);
+        } else {
+          if (display === '0') {
+            setDisplay(value);
+          } else {
+            if (display.replace('-', '').replace('.', '').length >= 12) break;
+            setDisplay(display + value);
+          }
+        }
+        break;
+      }
+    }
+  }, [display, expression, operator, firstOperand, waitingForSecond, justCalculated, onCalculation]);
 
   return (
-    <div className="glass card-shadow rounded-3xl overflow-hidden animate-slide-up">
+    <div className={`w-80 sm:w-96 rounded-3xl shadow-2xl overflow-hidden ${
+      isDark
+        ? 'bg-gray-900 shadow-black/50'
+        : 'bg-white shadow-gray-200/80'
+    }`}>
       {/* Display */}
       <CalculatorDisplay
-        expression={displayExpression}
-        current={current || '0'}
-        justEvaluated={justEvaluated}
+        display={display}
+        expression={expression}
+        isDark={isDark}
       />
 
-      {/* Share bar */}
-      {justEvaluated && current !== 'Error' && (
-        <div className="px-5 py-2.5 bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-700 flex items-center justify-between border-t border-white/10">
-          <span className="text-white/60 text-xs">Result ready to share</span>
-          <ShareButton expression={lastExpression} result={current} />
-        </div>
-      )}
-
-      {/* Error/saving indicator */}
-      {(saving || saveError) && (
-        <div className="px-5 py-1 bg-gradient-to-r from-violet-600 to-indigo-700 flex items-center justify-end">
-          {saving && <span className="text-white/50 text-xs">Saving...</span>}
-          {saveError && <span className="text-red-300 text-xs">Failed to save</span>}
-        </div>
-      )}
+      {/* Share button */}
+      <div className={`px-4 pb-2 flex justify-end ${
+        isDark ? 'bg-gray-900' : 'bg-white'
+      }`}>
+        <ShareButton
+          expression={lastExpression}
+          result={lastResult}
+          isDark={isDark}
+        />
+      </div>
 
       {/* Buttons */}
-      <div className="p-4 grid grid-cols-4 gap-3">
-        {BUTTONS.map((row, rowIndex) =>
-          row.map((btn) => (
-            <CalculatorButton
-              key={`${rowIndex}-${btn.action}`}
-              label={btn.label}
-              onClick={() => handleButton(btn.action)}
-              variant={btn.variant || 'default'}
-              className={`h-16 ${btn.variant === 'zero' ? 'col-span-2' : ''}`}
-            />
-          ))
-        )}
+      <div className={`grid grid-cols-4 gap-3 p-4 ${
+        isDark ? 'bg-gray-900' : 'bg-white'
+      }`}>
+        {BUTTONS.map((btn) => (
+          <CalculatorButton
+            key={btn.value + btn.label}
+            config={btn}
+            isDark={isDark}
+            onClick={handleButton}
+            currentOperator={operator}
+          />
+        ))}
       </div>
     </div>
   );

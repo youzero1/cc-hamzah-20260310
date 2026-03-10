@@ -9,6 +9,7 @@ export async function GET() {
 
     const calculations = await repo.find({
       order: { createdAt: 'DESC' },
+      take: 100,
     });
 
     return NextResponse.json(calculations);

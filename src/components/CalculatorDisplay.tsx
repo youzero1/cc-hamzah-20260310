@@ -1,45 +1,56 @@
 'use client';
 
 interface CalculatorDisplayProps {
+  display: string;
   expression: string;
-  current: string;
-  justEvaluated: boolean;
+  isDark: boolean;
 }
 
-export default function CalculatorDisplay({ expression, current, justEvaluated }: CalculatorDisplayProps) {
-  const fontSize =
-    current.length > 12
-      ? 'text-2xl'
-      : current.length > 8
-      ? 'text-3xl'
-      : current.length > 6
-      ? 'text-4xl'
-      : 'text-5xl';
+export default function CalculatorDisplay({
+  display,
+  expression,
+  isDark,
+}: CalculatorDisplayProps) {
+  const isError = display === 'Error';
+
+  const getFontSize = () => {
+    const len = display.length;
+    if (len <= 6) return 'text-5xl sm:text-6xl';
+    if (len <= 9) return 'text-4xl sm:text-5xl';
+    if (len <= 12) return 'text-3xl sm:text-4xl';
+    return 'text-2xl sm:text-3xl';
+  };
 
   return (
-    <div className="px-6 pt-6 pb-4 rounded-t-3xl bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-700 relative overflow-hidden">
-      {/* Background decoration */}
-      <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2" />
-      <div className="absolute bottom-0 left-0 w-20 h-20 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
-
+    <div className={`px-6 pt-8 pb-4 ${
+      isDark ? 'bg-gray-900' : 'bg-white'
+    }`}>
       {/* Expression */}
-      <div className="text-right min-h-[24px] mb-2">
-        <p className="text-white/60 text-sm font-light truncate">
-          {expression || '\u00a0'}
-        </p>
+      <div className={`h-6 text-right text-sm truncate mb-2 ${
+        isDark ? 'text-gray-400' : 'text-gray-400'
+      }`}>
+        {expression || '\u00A0'}
       </div>
 
-      {/* Current value */}
-      <div className="text-right min-h-[64px] flex items-end justify-end">
-        <p
-          className={`text-white font-light tracking-tight transition-all duration-200 ${fontSize} ${
-            justEvaluated ? 'text-white' : 'text-white'
-          }`}
-          style={{ fontVariantNumeric: 'tabular-nums' }}
-        >
-          {current || '0'}
-        </p>
+      {/* Main display */}
+      <div
+        className={`text-right font-light tracking-tight transition-all duration-100 ${
+          getFontSize()
+        } ${
+          isError
+            ? 'text-red-500'
+            : isDark
+            ? 'text-white'
+            : 'text-gray-900'
+        }`}
+      >
+        {display}
       </div>
+
+      {/* Divider */}
+      <div className={`mt-4 h-px ${
+        isDark ? 'bg-gray-800' : 'bg-gray-100'
+      }`} />
     </div>
   );
 }

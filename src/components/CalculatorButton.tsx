@@ -1,46 +1,67 @@
 'use client';
 
-import { useRef } from 'react';
+import { ButtonConfig } from '@/types';
 
 interface CalculatorButtonProps {
-  label: string;
-  onClick: () => void;
-  variant?: 'default' | 'operator' | 'special' | 'equals' | 'zero';
-  className?: string;
+  config: ButtonConfig;
+  isDark: boolean;
+  onClick: (value: string) => void;
+  currentOperator: string | null;
 }
 
 export default function CalculatorButton({
-  label,
+  config,
+  isDark,
   onClick,
-  variant = 'default',
-  className = '',
+  currentOperator,
 }: CalculatorButtonProps) {
-  const btnRef = useRef<HTMLButtonElement>(null);
+  const { label, value, type } = config;
 
-  const handleClick = () => {
-    onClick();
-  };
+  const isActiveOperator = type === 'operator' && currentOperator === value;
 
-  const baseClasses =
-    'calculator-btn rounded-2xl font-semibold text-lg flex items-center justify-center select-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-violet-400 focus:ring-offset-1';
+  const getButtonClasses = () => {
+    const base = 'calculator-btn h-16 sm:h-18 text-xl font-semibold rounded-2xl transition-all duration-100 active:scale-95';
 
-  const variantClasses = {
-    default:
-      'bg-white/80 dark:bg-slate-700/80 text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-600 shadow-sm hover:shadow-md active:shadow-sm',
-    operator:
-      'bg-violet-100 dark:bg-violet-900/60 text-violet-700 dark:text-violet-300 hover:bg-violet-200 dark:hover:bg-violet-800/60 shadow-sm hover:shadow-md',
-    special:
-      'bg-slate-200/80 dark:bg-slate-600/80 text-slate-600 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-500 shadow-sm',
-    equals:
-      'bg-gradient-to-br from-violet-500 to-purple-600 text-white hover:from-violet-400 hover:to-purple-500 shadow-lg hover:shadow-xl shadow-violet-300 dark:shadow-violet-900',
-    zero: 'bg-white/80 dark:bg-slate-700/80 text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-600 shadow-sm hover:shadow-md col-span-2',
+    if (type === 'equals') {
+      return `${base} col-span-1 bg-gradient-to-br from-violet-500 to-pink-500 text-white hover:from-violet-400 hover:to-pink-400 shadow-lg shadow-violet-500/30`;
+    }
+
+    if (type === 'operator') {
+      if (isActiveOperator) {
+        return `${base} ${
+          isDark
+            ? 'bg-violet-400 text-gray-900'
+            : 'bg-violet-600 text-white'
+        }`;
+      }
+      return `${base} ${
+        isDark
+          ? 'bg-violet-600 text-white hover:bg-violet-500'
+          : 'bg-violet-100 text-violet-700 hover:bg-violet-200'
+      }`;
+    }
+
+    if (type === 'action') {
+      return `${base} ${
+        isDark
+          ? 'bg-gray-700 text-white hover:bg-gray-600'
+          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+      }`;
+    }
+
+    // number
+    return `${base} ${
+      isDark
+        ? 'bg-gray-800 text-white hover:bg-gray-700'
+        : 'bg-gray-50 text-gray-900 hover:bg-gray-100 border border-gray-100'
+    }`;
   };
 
   return (
     <button
-      ref={btnRef}
-      onClick={handleClick}
-      className={`${baseClasses} ${variantClasses[variant]} ${className} transition-all duration-150`}
+      className={getButtonClasses()}
+      onClick={() => onClick(value)}
+      aria-label={label}
     >
       {label}
     </button>
