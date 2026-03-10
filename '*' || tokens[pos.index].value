@@ -1,0 +1,45 @@
+'/')
+  ) {
+    const op = tokens[pos.index].value;
+    pos.index++;
+    const right = parseFactor(tokens, pos);
+    if (op === '*') {
+      left = left * right;
+    } else {
+      if (right === 0) {
+        throw new Error('Division by zero');
+      }
+      left = left / right;
+    }
+  }
+
+  return left;
+}
+
+function parseFactor(tokens: Token[], pos: { index: number }): number {
+  if (pos.index >= tokens.length) {
+    throw new Error('Unexpected end of expression');
+  }
+
+  const token = tokens[pos.index];
+
+  if (token.type === 'number') {
+    pos.index++;
+    const val = parseFloat(token.value);
+    if (isNaN(val)) {
+      throw new Error(`Invalid number: ${token.value}`);
+    }
+    return val;
+  }
+
+  if (token.type === 'lparen') {
+    pos.index++; // skip '('
+    const result = parseExpression(tokens, pos);
+    if (pos.index >= tokens.length || tokens[pos.index].type !== 'rparen') {
+      throw new Error('Missing closing parenthesis');
+    }
+    pos.index++; // skip ')'
+    return result;
+  }
+
+  if (token.type
