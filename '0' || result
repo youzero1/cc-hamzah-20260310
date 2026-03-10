@@ -1,0 +1,199 @@
+'Error') {
+    return null;
+  }
+
+  return (
+    <button
+      onClick={handleShare}
+      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+        copied
+          ? 'bg-green-500/20 text-green-400'
+          : isDark
+          ? 'bg-gray-700/50 text-gray-400 hover:bg-gray-700 hover:text-gray-300'
+          : 'bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-700'
+      }`}
+      aria-label="Share calculation"
+    >
+      {copied ? (
+        <>
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+          Copied!
+        </>
+      ) : (
+        <>
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
+            />
+          </svg>
+          Share
+        </>
+      )}
+    </button>
+  );
+}
+</file>
+
+<file path="src/components/Calculator.tsx">
+'use client';
+
+import React, { useState, useCallback, useEffect } from 'react';
+import CalculatorDisplay from './CalculatorDisplay';
+import CalculatorButton from './CalculatorButton';
+import ShareButton from './ShareButton';
+import { ButtonConfig } from '@/types';
+import { evaluate } from '@/lib/calculator';
+
+interface CalculatorProps {
+  isDark: boolean;
+  onCalculation: (expression: string, result: string) => void;
+}
+
+const buttons: ButtonConfig[] = [
+  { label: 'C', value: 'clear', type: 'action' },
+  { label: '⌫', value: 'backspace', type: 'action' },
+  { label: '%', value: '%', type: 'operator' },
+  { label: '÷', value: '/', type: 'operator' },
+
+  { label: '7', value: '7', type: 'number' },
+  { label: '8', value: '8', type: 'number' },
+  { label: '9', value: '9', type: 'number' },
+  { label: '×', value: '*', type: 'operator' },
+
+  { label: '4', value: '4', type: 'number' },
+  { label: '5', value: '5', type: 'number' },
+  { label: '6', value: '6', type: 'number' },
+  { label: '-', value: '-', type: 'operator' },
+
+  { label: '1', value: '1', type: 'number' },
+  { label: '2', value: '2', type: 'number' },
+  { label: '3', value: '3', type: 'number' },
+  { label: '+', value: '+', type: 'operator' },
+
+  { label: '0', value: '0', type: 'number', span: 2 },
+  { label: '.', value: '.', type: 'number' },
+  { label: '=', value: '=', type: 'equals' },
+];
+
+export default function Calculator({ isDark, onCalculation }: CalculatorProps) {
+  const [expression, setExpression] = useState('');
+  const [displayResult, setDisplayResult] = useState('0');
+  const [lastResult, setLastResult] = useState('');
+  const [justCalculated, setJustCalculated] = useState(false);
+
+  const handleCalculate = useCallback(() => {
+    if (!expression) return;
+
+    const result = evaluate(expression);
+    setDisplayResult(result);
+    setLastResult(result);
+    setJustCalculated(true);
+
+    if (result !== 'Error') {
+      onCalculation(expression, result);
+    }
+  }, [expression, onCalculation]);
+
+  const handleButtonClick = useCallback(
+    (value: string) => {
+      switch (value) {
+        case 'clear':
+          setExpression('');
+          setDisplayResult('0');
+          setJustCalculated(false);
+          break;
+
+        case 'backspace':
+          if (justCalculated) {
+            setExpression('');
+            setDisplayResult('0');
+            setJustCalculated(false);
+          } else {
+            setExpression((prev) => prev.slice(0, -1));
+          }
+          break;
+
+        case '=':
+          handleCalculate();
+          break;
+
+        case '%':
+          if (expression) {
+            const result = evaluate(expression);
+            if (result !== 'Error') {
+              const percentValue = String(parseFloat(result) / 100);
+              setExpression(percentValue);
+              setDisplayResult(percentValue);
+              setJustCalculated(true);
+            }
+          }
+          break;
+
+        default: {
+          const isOperator = ['+', '-', '*', '/'].includes(value);
+
+          if (justCalculated) {
+            if (isOperator && lastResult !== 'Error') {
+              // Continue with last result
+              setExpression(lastResult + value);
+              setJustCalculated(false);
+            } else {
+              // Start fresh
+              setExpression(value);
+              setDisplayResult(value || '0');
+              setJustCalculated(false);
+            }
+          } else {
+            // Prevent multiple consecutive operators (except minus for negative)
+            if (isOperator && expression) {
+              const lastChar = expression[expression.length - 1];
+              if (['+', '-', '*', '/'].includes(lastChar)) {
+                if (value === '-' && lastChar !== '-') {
+                  setExpression((prev) => prev + value);
+                } else {
+                  setExpression((prev) => prev.slice(0, -1) + value);
+                }
+                return;
+              }
+            }
+
+            // Prevent multiple dots in same number
+            if (value === '.') {
+              const parts = expression.split(/[+\-*/]/);
+              const currentNumber = parts[parts.length - 1];
+              if (currentNumber.includes('.')) return;
+            }
+
+            setExpression((prev) => prev + value);
+          }
+          break;
+        }
+      }
+    },
+    [expression, justCalculated, lastResult, handleCalculate]
+  );
+
+  // Keyboard support
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const key = e.key;
+
+      if (key >= '0' && key <= '9') {
+        handleButtonClick(key);
+      } else if (key === '.') {
+        handleButtonClick('.');
+      } else if (key === '+') {
+        handleButtonClick('+');
+      } else if (key === '-') {
+        handleButtonClick('-');
+      } else if (key === '*') {
+        handleButtonClick('*');
+      } else if (key === '/') {
+        e.preventDefault();
+        handleButtonClick('/');
+      } else if (key
