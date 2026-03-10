@@ -1,0 +1,276 @@
+'-') {
+    pos.index++;
+    const val = parseFactor(tokens, pos);
+    return -val;
+  }
+
+  throw new Error(`Unexpected token: ${token.value}`);
+}
+
+export function evaluate(expression: string): string {
+  if (!expression || expression.trim() === '') {
+    throw new Error('Empty expression');
+  }
+
+  try {
+    const tokens = tokenize(expression);
+    if (tokens.length === 0) {
+      throw new Error('Empty expression');
+    }
+
+    const pos = { index: 0 };
+    const result = parseExpression(tokens, pos);
+
+    if (pos.index < tokens.length) {
+      throw new Error('Unexpected tokens after expression');
+    }
+
+    if (!isFinite(result)) {
+      return 'Error';
+    }
+
+    // Format result: remove trailing zeros after decimal point
+    const formatted = parseFloat(result.toPrecision(12));
+    return String(formatted);
+  } catch {
+    return 'Error';
+  }
+}
+
+export function formatExpression(expression: string): string {
+  return expression
+    .replace(/\*/g, '×')
+    .replace(/\//g, '÷');
+}
+
+export function isValidPartialExpression(expression: string): boolean {
+  // Allow empty
+  if (!expression) return true;
+
+  // Basic validation for partial expressions being typed
+  const cleaned = expression.replace(/\s/g, '');
+
+  // Check for invalid consecutive operators
+  if (/[+\-*/×÷]{3,}/.test(cleaned)) return false;
+
+  // Check for invalid start (except minus for negative)
+  if (/^[*/×÷]/.test(cleaned)) return false;
+
+  return true;
+}
+</file>
+
+<file path="src/lib/database.ts">
+import 'reflect-metadata';
+import { DataSource } from 'typeorm';
+import { Calculation } from '@/entities/Calculation';
+
+let dataSource: DataSource | null = null;
+
+export async function getDataSource(): Promise<DataSource> {
+  if (dataSource && dataSource.isInitialized) {
+    return dataSource;
+  }
+
+  const dbPath = process.env.DATABASE_PATH || './data/calculator.db';
+
+  dataSource = new DataSource({
+    type: 'better-sqlite3',
+    database: dbPath,
+    entities: [Calculation],
+    synchronize: true,
+    logging: process.env.NODE_ENV === 'development',
+  });
+
+  await dataSource.initialize();
+  console.log('Database initialized at:', dbPath);
+
+  return dataSource;
+}
+</file>
+
+<file path="src/entities/Calculation.ts">
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+} from 'typeorm';
+
+@Entity('calculations')
+export class Calculation {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @Column({ type: 'text' })
+  expression!: string;
+
+  @Column({ type: 'text' })
+  result!: string;
+
+  @CreateDateColumn()
+  createdAt!: Date;
+}
+</file>
+
+<file path="src/components/CalculatorDisplay.tsx">
+'use client';
+
+import React from 'react';
+
+interface CalculatorDisplayProps {
+  expression: string;
+  result: string;
+  isDark: boolean;
+}
+
+export default function CalculatorDisplay({
+  expression,
+  result,
+  isDark,
+}: CalculatorDisplayProps) {
+  const displayExpression = expression
+    .replace(/\*/g, '×')
+    .replace(/\//g, '÷');
+
+  return (
+    <div
+      className={`w-full p-6 rounded-2xl mb-4 min-h-[120px] flex flex-col justify-end ${
+        isDark
+          ? 'bg-gray-800/50 border border-gray-700/50'
+          : 'bg-white border border-gray-200'
+      }`}
+    >
+      {/* Expression */}
+      <div
+        className={`text-right text-sm font-medium min-h-[24px] mb-2 truncate ${
+          isDark ? 'text-gray-400' : 'text-gray-500'
+        }`}
+      >
+        {displayExpression || '\u00A0'}
+      </div>
+
+      {/* Result */}
+      <div
+        className={`text-right text-4xl font-bold truncate ${
+          result === 'Error'
+            ? 'text-red-400'
+            : isDark
+            ? 'text-white'
+            : 'text-gray-900'
+        }`}
+      >
+        {result || '0'}
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/CalculatorButton.tsx">
+'use client';
+
+import React from 'react';
+import { ButtonConfig } from '@/types';
+
+interface CalculatorButtonProps {
+  config: ButtonConfig;
+  isDark: boolean;
+  onClick: (value: string) => void;
+}
+
+export default function CalculatorButton({
+  config,
+  isDark,
+  onClick,
+}: CalculatorButtonProps) {
+  const { label, value, type, span = 1 } = config;
+
+  const getButtonStyle = (): string => {
+    const base = 'calculator-btn h-16 text-lg font-semibold rounded-2xl transition-all duration-100';
+    const spanClass = span > 1 ? `col-span-${span}` : '';
+
+    if (type === 'equals') {
+      return `${base} ${spanClass} bg-gradient-to-r from-violet-500 to-pink-500 text-white hover:from-violet-600 hover:to-pink-600 shadow-lg shadow-violet-500/25`;
+    }
+
+    if (type === 'operator') {
+      return `${base} ${spanClass} ${
+        isDark
+          ? 'bg-violet-500/20 text-violet-400 hover:bg-violet-500/30'
+          : 'bg-violet-100 text-violet-600 hover:bg-violet-200'
+      }`;
+    }
+
+    if (type === 'action') {
+      return `${base} ${spanClass} ${
+        isDark
+          ? 'bg-gray-700/50 text-gray-300 hover:bg-gray-700'
+          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+      }`;
+    }
+
+    // number
+    return `${base} ${spanClass} ${
+      isDark
+        ? 'bg-gray-800 text-white hover:bg-gray-700'
+        : 'bg-white text-gray-900 hover:bg-gray-100 border border-gray-200'
+    }`;
+  };
+
+  return (
+    <button
+      className={getButtonStyle()}
+      onClick={() => onClick(value)}
+      aria-label={label}
+      style={span > 1 ? { gridColumn: `span ${span}` } : undefined}
+    >
+      {label}
+    </button>
+  );
+}
+</file>
+
+<file path="src/components/ShareButton.tsx">
+'use client';
+
+import React, { useState } from 'react';
+
+interface ShareButtonProps {
+  expression: string;
+  result: string;
+  isDark: boolean;
+}
+
+export default function ShareButton({
+  expression,
+  result,
+  isDark,
+}: ShareButtonProps) {
+  const [copied, setCopied] = useState(false);
+
+  const handleShare = async () => {
+    const text = `${expression} = ${result}`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Calculation',
+          text,
+        });
+        return;
+      } catch {
+        // User cancelled or share failed, fall through to clipboard
+      }
+    }
+
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      console.error('Failed to copy to clipboard');
+    }
+  };
+
+  if (!expression || !result || result
