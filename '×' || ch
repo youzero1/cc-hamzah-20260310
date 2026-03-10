@@ -1,0 +1,3 @@
+'÷') {
+      // Handle unary minus
+      const normalized = ch
