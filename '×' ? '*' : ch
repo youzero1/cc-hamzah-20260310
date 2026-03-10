@@ -1,0 +1,62 @@
+'÷' ? '/' : ch;
+      if (
+        normalized === '-' &&
+        (tokens.length === 0 ||
+          tokens[tokens.length - 1].type === 'lparen' ||
+          tokens[tokens.length - 1].type === 'operator')
+      ) {
+        // Unary minus: read the number
+        let num = '-';
+        i++;
+        while (i < expr.length && (isDigit(expr[i]) || expr[i] === '.')) {
+          num += expr[i];
+          i++;
+        }
+        if (num === '-') {
+          throw new Error('Invalid expression: lone minus sign');
+        }
+        tokens.push({ type: 'number', value: num });
+      } else {
+        tokens.push({ type: 'operator', value: normalized });
+        i++;
+      }
+    } else if (isDigit(ch) || ch === '.') {
+      let num = '';
+      while (i < expr.length && (isDigit(expr[i]) || expr[i] === '.')) {
+        num += expr[i];
+        i++;
+      }
+      tokens.push({ type: 'number', value: num });
+    } else if (ch === '%') {
+      // Percentage: convert last number token
+      if (tokens.length > 0 && tokens[tokens.length - 1].type === 'number') {
+        const last = tokens[tokens.length - 1];
+        last.value = String(parseFloat(last.value) / 100);
+      }
+      i++;
+    } else {
+      throw new Error(`Unexpected character: ${ch}`);
+    }
+  }
+
+  return tokens;
+}
+
+function isDigit(ch: string): boolean {
+  return ch >= '0' && ch <= '9';
+}
+
+/**
+ * Recursive descent parser for arithmetic expressions.
+ * Grammar:
+ *   expr   -> term (('+' | '-') term)*
+ *   term   -> factor (('*' | '/') factor)*
+ *   factor -> NUMBER | '(' expr ')' | '-' factor
+ */
+function parseExpression(tokens: Token[], pos: { index: number }): number {
+  let left = parseTerm(tokens, pos);
+
+  while (
+    pos.index < tokens.length &&
+    tokens[pos.index].type === 'operator' &&
+    (tokens[pos.index].value
